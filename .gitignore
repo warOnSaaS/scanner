@@ -1,0 +1,9 @@
+node_modules
+.env*
+.vercel
+.shots
+public/ui
+reports
+*.log
+public/favicon.svg
+.names

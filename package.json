@@ -1,0 +1,50 @@
+{
+  "name": "@waronsaas/scanner",
+  "version": "0.1.0",
+  "description": "A free website scanner: what AI assistants and search engines can read on a site, scored out of 100, with the fix for every gap. Library, CLI, HTTP API, web page and MCP server.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./checks": "./src/checks.mjs",
+    "./report": "./src/report.mjs",
+    "./server": "./server/app.mjs",
+    "./mcp": "./server/mcp.mjs"
+  },
+  "bin": {
+    "wos-scan": "bin/wos-scan.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "server",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "node dev.mjs",
+    "test": "node --test test/",
+    "check": "node --test test/ && node scripts/check-clean.mjs",
+    "check:clean": "node scripts/check-clean.mjs",
+    "sync-kit": "node scripts/sync-kit.mjs",
+    "shots": "node scripts/shots.mjs",
+    "scan": "node bin/wos-scan.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warOnSaaS/scanner"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@vercel/blob": "^2.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
