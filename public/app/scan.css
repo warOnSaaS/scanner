@@ -1,5 +1,7 @@
 /* warOnSaaS Scanner: what ui-design does not have, in its style.
-   Every colour, face and radius comes from the kit's midnight theme (--ui-*). */
+   Every colour, face and radius comes from the kit's midnight scheme (--ui-*, src/tokens.css). */
+/* numbers in the pixel face, as the scanner always had them */
+:root{--ui-numeric:"Departure Mono","Geist Mono",ui-monospace,monospace}
 :root{--wrap:1180px;--good:var(--ui-good);--warn:var(--ui-warn);--bad:var(--ui-bad);color-scheme:dark}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
 body{overflow-x:hidden;line-height:1.55}

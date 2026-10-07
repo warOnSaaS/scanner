@@ -4,7 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 const ui = p => 'file://' + path.resolve('public/ui', p);
 const tank = fs.readFileSync('public/ui/logo.svg', 'utf8').replace(/<!--[\s\S]*?-->/, '').replace(/ width="\d+" height="\d+"/, ' width="96"');
-const html = `<!doctype html><html><head><link rel="stylesheet" href="${ui('src/ui.css')}"><link rel="stylesheet" href="${ui('themes/midnight.css')}"><style>
+const html = `<!doctype html><html data-scheme="midnight" data-shape="round" data-type="pixel"><head><link rel="stylesheet" href="${ui('src/ui.css')}"><link rel="stylesheet" href="${ui('src/tokens.css')}"><style>
 body{margin:0;width:1200px;height:630px;display:flex;flex-direction:column;justify-content:center;padding:0 90px;box-sizing:border-box;
 background:radial-gradient(900px 500px at 70% 0%,rgba(125,211,252,.16),transparent 70%),#09090b}
 .k{font:22px var(--ui-numeric);letter-spacing:.08em;text-transform:uppercase;color:var(--ui-accent);margin:34px 0 18px}

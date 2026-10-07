@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 const kit = path.resolve(process.argv[2] ?? process.env.UI_DESIGN_DIR ?? path.join('..', 'waronsaas-ui-design'));
 const ref = process.argv[3] ?? process.env.UI_DESIGN_REF ?? 'main';
 const files = [
-  ['src/ui.css'], ['themes/midnight.css'],
+  ['src/ui.css'], ['src/tokens.css'],
   ['fonts/geist.woff2'], ['fonts/geist-mono.woff2'], ['fonts/departure-mono.woff2'],
   ['fonts/OFL-Geist.txt'], ['fonts/OFL-DepartureMono.txt'],
   ['www/logo.svg', 'logo.svg'], ['NOTICE'], ['LICENSE'],

@@ -1,5 +1,5 @@
 /* The pages, rendered on the server: the scanner (home), a report, the looping preview (embed)
-   and not found. Built on warOnSaaS ui-design (public/ui, midnight theme) plus public/app/scan.css.
+   and not found. Built on warOnSaaS ui-design (public/ui, the midnight scheme) plus public/app/scan.css.
    Reports render on the server so a link pasted into Slack or X unfurls with the grade. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +14,7 @@ export const HUB = 'https://waronsaas-site.vercel.app';
 
 /* Fingerprinted asset URLs, so a new deploy never meets a cached old copy. */
 const version = f => { try { return crypto.createHash('sha256').update(fs.readFileSync(path.join(PUBLIC, f))).digest('hex').slice(0, 10); } catch { return '0'; } };
-export const ASSETS = Object.fromEntries(['app/scan.css', 'app/scan.js', 'ui/src/ui.css', 'ui/themes/midnight.css'].map(f => [f, `/${f}?v=${version(f)}`]));
+export const ASSETS = Object.fromEntries(['app/scan.css', 'app/scan.js', 'ui/src/ui.css', 'ui/src/tokens.css'].map(f => [f, `/${f}?v=${version(f)}`]));
 
 let TANK = '';
 try {
@@ -33,7 +33,7 @@ const I = {
 
 function shell({ origin, title, description, canonical = '/', body, page = '', ld = null, robots = 'index,follow', og = true }) {
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-scheme="midnight" data-shape="round" data-type="grotesk" data-surface="bordered" data-motion="subtle">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title>
@@ -48,7 +48,7 @@ ${og ? `<meta property="og:type" content="website"><meta property="og:site_name"
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/ui/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${ASSETS['ui/src/ui.css']}">
-<link rel="stylesheet" href="${ASSETS['ui/themes/midnight.css']}">
+<link rel="stylesheet" href="${ASSETS['ui/src/tokens.css']}">
 <link rel="stylesheet" href="${ASSETS['app/scan.css']}">
 ${ld ? `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>` : ''}
 </head>
