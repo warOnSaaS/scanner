@@ -1,9 +1,9 @@
 // Records a real scan, as it streamed, into public/app/example.json: the scan the page replays
 // until someone runs their own, and the one the hub's preview card loops.
-//   node scripts/record-example.mjs [site] [server]   (defaults: waronsaas-site.vercel.app, http://localhost:8787)
+//   node scripts/record-example.mjs [site] [server]   (defaults: waronsaas.com, http://localhost:8787)
 import fs from 'node:fs';
 
-const site = process.argv[2] || 'waronsaas-site.vercel.app';
+const site = process.argv[2] || 'waronsaas.com';
 const base = process.argv[3] || 'http://localhost:8787';
 const r = await fetch(`${base}/api/scan/stream?url=${encodeURIComponent(site)}&rescan=1`);
 const t0 = Date.now(), events = [];

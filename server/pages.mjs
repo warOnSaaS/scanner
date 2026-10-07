@@ -10,7 +10,7 @@ import { CHECKS, AREA_NAME, AREA_SHARE, AREA_ABOUT } from '../src/checks.mjs';
 
 const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 export const GITHUB = 'https://github.com/warOnSaaS/scanner';
-export const HUB = 'https://waronsaas-site.vercel.app';
+export const HUB = 'https://waronsaas.com';
 
 /* Fingerprinted asset URLs, so a new deploy never meets a cached old copy. */
 const version = f => { try { return crypto.createHash('sha256').update(fs.readFileSync(path.join(PUBLIC, f))).digest('hex').slice(0, 10); } catch { return '0'; } };
@@ -78,7 +78,7 @@ const composer = ({ id = 'scan', value = '', big = false } = {}) => `<form class
 const consoleBox = ({ example = true, loop = false } = {}) => `<div class="con" data-console${example ? ' data-example' : ''}${loop ? ' data-loop' : ''}>
   <div class="con-bar">
     <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-    <span class="con-title">scan <b data-host>waronsaas-site.vercel.app</b></span>
+    <span class="con-title">scan <b data-host>waronsaas.com</b></span>
     <span class="con-chip" data-chip>${example ? 'Example' : 'Ready'}</span>
     <span class="con-time" data-time>0.0s</span>
   </div>
@@ -115,7 +115,7 @@ export function homePage({ origin, hasPagespeed = true }) {
     <h1>Can AI assistants read your website?</h1>
     <p class="lede">Put in your website address. In about thirty seconds you see what ChatGPT, Claude and Google can read on your home page, a score out of 100, and the fix for every gap.</p>
     ${composer({ big: true })}
-    <p class="hint">Try <a href="/?url=waronsaas-site.vercel.app" data-try>waronsaas-site.vercel.app</a> or <a href="/?url=example.com" data-try>example.com</a>. We fetch your home page and six public files, the way any crawler does.</p>
+    <p class="hint">Try <a href="/?url=waronsaas.com" data-try>waronsaas.com</a> or <a href="/?url=example.com" data-try>example.com</a>. We fetch your home page and six public files, the way any crawler does.</p>
   </div>
   <div class="hero-con">${consoleBox({ example: true })}</div>
 </section>

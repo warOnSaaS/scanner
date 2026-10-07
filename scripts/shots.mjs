@@ -11,7 +11,7 @@ fs.mkdirSync(out, { recursive: true });
 let base = process.argv[2], srv;
 if (!base) { const { serve } = await import('../dev.mjs'); srv = await serve(); base = `http://localhost:${srv.address().port}`; }
 const [liveDesk, livePhone] = (process.env.SITES || 'example.com,example.org').split(',');
-const reportSite = process.env.REPORT || 'waronsaas-site.vercel.app';
+const reportSite = process.env.REPORT || 'waronsaas.com';
 const slug = reportSite.replace(/[^a-z0-9]+/g, '-');
 
 // make sure the report exists
