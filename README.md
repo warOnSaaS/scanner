@@ -27,12 +27,12 @@ Every capability is one operation in `server/ops.mjs`. The MCP tools and the API
 
 ## Use it from your agent
 
-The hosted scanner's MCP address is `https://waronsaas-scanner.vercel.app/mcp` (Streamable HTTP, no sign-in).
+The hosted scanner's MCP address is `https://scanner.waronsaas.com/mcp` (Streamable HTTP). The first time, your assistant sends you to sign in with a free warOnSaaS account; after that it scans as you, and you can see it or sign it out at [account.waronsaas.com](https://account.waronsaas.com).
 
 - **Claude** (web, desktop, phone): Settings, Connectors, Add custom connector, paste the address.
 - **ChatGPT** (developer mode): Settings, Apps and Connectors, Create, paste the address.
-- **Claude Code**: `claude mcp add --transport http scanner https://waronsaas-scanner.vercel.app/mcp`
-- **Codex**: `codex mcp add scanner --url https://waronsaas-scanner.vercel.app/mcp`
+- **Claude Code**: `claude mcp add --transport http scanner https://scanner.waronsaas.com/mcp`
+- **Codex**: `codex mcp add scanner --url https://scanner.waronsaas.com/mcp`
 - **Scanning from your own machine instead**: `claude mcp add scanner -- npx -y github:warOnSaaS/scanner mcp` (or the same command after `codex mcp add scanner --`). Reports are kept in `~/.cache/wos-scanner`.
 
 Then ask: "Scan mysite.com and tell me the three fixes worth the most", or "Compare mysite.com with competitor.com".
@@ -84,15 +84,28 @@ npm run shots             # screenshots at 1440 and 390 wide into .shots/
 | `PAGESPEED_KEY` | Optional. Google PageSpeed API key. Server-side only; never sent to the browser. Without it the scan leaves PageSpeed out and says so. |
 | `BLOB_READ_WRITE_TOKEN` | Optional. Keeps reports in Vercel Blob so share links last. Without it, reports live in memory (or `./reports` locally). |
 | `SITE_URL` | Optional. The public address used in share links. Defaults to the request's own host. |
+| `AUTH_PROVIDER` | Optional. `waronsaas` turns on sign-in with a warOnSaaS account (below). `github` or `local` keeps the scanner open with no sign-in, as it always was; that is also the default when no client id is set. |
+| `WOS_ACCOUNT_CLIENT_ID`, `WOS_ACCOUNT_CLIENT_SECRET` | The scanner's client at the account. Setting them turns sign-in on. `WOS_ACCOUNT_URL` points at your own copy of warOnSaaS Account if you run one. |
+| `SESSION_SECRET` | Optional. Seals the session cookie and the tokens handed to AI apps. Defaults to the client secret. |
 
 Locally, put them in `.env.local` (git-ignored).
+
+### Sign-in: look freely, scan with an account
+
+With the account on (the hosted scanner), nothing is walled off for viewing: the home page, every report, every share link and the compare page are open to anyone, and so are `GET /api/report`, `/api/scans`, `/api/checks` and `/api/scan/status`. Starting a fresh scan needs a free warOnSaaS account:
+
+- on the page, pressing Scan while signed out shows the sign-in prompt (`account.waronsaas.com/prompt.js`); after signing in you come straight back and the scan runs;
+- over the API, a fresh scan without a session answers `401 { "error": { "code": "sign_in", "message": "Sign in to your warOnSaaS account" } }`; a site scanned in the last day is answered from that scan, which is a view and stays open;
+- over MCP, AI apps sign in with the usual OAuth flow (`/.well-known/oauth-authorization-server`, registration, PKCE), which sends the person to the account as a connection named "Claude via Scanner" and so on.
+
+Scans are counted per account, in the account's shared limits: 20 fresh scans an hour and 100 a day (`scanner.scan`, `scanner.scan_day`). Who ran a scan is kept with the report and never shown. `server/auth.mjs` has the whole thing; `scripts/sync-account.mjs` copies the account client library into `lib/`.
 
 ### Limits
 
 A fresh scan fetches someone else's website and, with a key, spends a shared Google quota, so:
 
 - a site scanned in the last day is served from that scan (re-scans wait a quarter of an hour);
-- each visitor gets 6 fresh scans per ten minutes and 30 a day;
+- each visitor gets 6 fresh scans per ten minutes and 30 a day (with the account on: 20 an hour and 100 a day per account, and the per-visitor count stays as a looser backstop);
 - the server stops at 2,000 fresh scans and 1,500 PageSpeed runs a day.
 
 The counts live in each server instance's memory, so they are a floor. For a busy deployment add a rate-limit rule in the Vercel firewall on `/api/scan`, `/api/compare` and `/mcp`.

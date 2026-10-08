@@ -14,7 +14,7 @@
       { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
     ] },
     { "source": "/((?!embed).*)", "headers": [
-      { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" }
+      { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://account.waronsaas.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://account.waronsaas.com; frame-ancestors 'none'" }
     ] },
     { "source": "/embed", "headers": [
       { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' http://localhost:* https://*.vercel.app https://waronsaas.com https://*.waronsaas.com" }

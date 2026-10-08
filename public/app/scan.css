@@ -29,6 +29,9 @@ svg.fill{width:16px;height:16px;fill:currentColor}
 .nav a{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--ui-ink-2);font-size:14px;padding:7px 11px;border-radius:999px;transition:color .15s,background .15s}
 .nav a:hover{color:var(--ui-ink);background:var(--ui-surface-2)}
 .nav-gh{border:1px solid var(--ui-line-2)}
+/* the warOnSaaS account, on the hosted scanner: sign in, or your name and sign out */
+.nav-acct{border:1px solid var(--ui-line-2);margin-left:4px}
+.nav-me{border-color:transparent;color:var(--ui-ink);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}
 .foot{border-top:1px solid var(--ui-line);margin-top:40px}
 .foot-in{max-width:var(--wrap);margin:0 auto;padding:22px 24px 34px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px 24px;font-size:13px;color:var(--ui-ink-3)}
 .foot-l{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -237,7 +240,7 @@ svg.fill{width:16px;height:16px;fill:currentColor}
 }
 @media (max-width:760px){
   .top-in{padding:0 16px}
-  .brand em,.nav a:not(.nav-gh){display:none}
+  .brand em,.nav a:not(.nav-gh):not(.nav-acct),.nav a.nav-me{display:none}
   .hero{padding:40px 16px 24px}
   .hero .lede{font-size:16px;margin:16px 0 24px}
   .hero-con{margin-top:30px}

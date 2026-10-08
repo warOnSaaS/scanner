@@ -11,6 +11,14 @@
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
+  /* The hosted scanner asks for a warOnSaaS account before a scan (account.waronsaas.com/prompt.js is on the page).
+     Viewing never needs it. An answer of { error: { code: 'sign_in' } } means: show the sign-in prompt, not an error. */
+  var acctTag = document.querySelector('script[data-signin]');
+  var signedOut = !!acctTag && acctTag.getAttribute('data-signed-in') !== 'true';
+  function msgOf(err) { return typeof err === 'string' ? err : (err && err.message) || 'That did not finish.'; }
+  function codeOf(err) { return err && typeof err === 'object' ? err.code : ''; }
+  function askSignIn(what) { if (window.wosAccount && !window.wosAccount.signedIn) { window.wosAccount.prompt(what); return true; } return false; }
+
   /* ---- recently scanned (GET /api/scans, the list_recent_scans tool) ---- */
   function recent() {
     var sec = $('[data-recent]'); if (!sec) return;
@@ -42,7 +50,7 @@
       var q = '/api/compare?urls=' + encodeURIComponent(urls.join(',')) + (f.pagespeed.checked ? '&include_pagespeed=1' : '');
       fetch(q).then(function (r) { return r.json(); }).then(function (j) {
         btn.disabled = false; out.innerHTML = '';
-        if (!j.ok) { out.appendChild(el('p', 'con-err', j.error || 'That did not finish.')); return; }
+        if (!j.ok) { if (codeOf(j.error) === 'sign_in' && askSignIn('compare sites')) { out.hidden = true; return; } out.appendChild(el('p', 'con-err', msgOf(j.error))); return; }
         out.appendChild(el('h2', '', 'Side by side'));
         out.appendChild(el('p', 'rp-mean', j.summary));
         var grid = el('div', 'cmp-grid');
@@ -188,7 +196,12 @@
     es.addEventListener('cached', function (ev) { var d = JSON.parse(ev.data); chip.textContent = 'From cache'; line('con-cached is-head', 'Scanned ' + d.minutes + ' min ago', 'replaying'); });
     es.addEventListener('area', function (ev) { if (id === run) area(JSON.parse(ev.data), id); });
     es.addEventListener('done', function (ev) { settled = true; es.close(); if (id === run) { setTimeout(function () { done(JSON.parse(ev.data), id, false); setBusy(false); }, 500); } });
-    es.addEventListener('fail', function (ev) { settled = true; es.close(); if (id === run) fail(JSON.parse(ev.data).error || 'That did not finish.'); });
+    es.addEventListener('fail', function (ev) {
+      settled = true; es.close(); if (id !== run) return;
+      var d = JSON.parse(ev.data);
+      fail(msgOf(d.error));
+      if (d.code === 'sign_in') askSignIn('run a scan');
+    });
     es.onerror = function () { if (settled) return; settled = true; es.close(); if (id === run) fail('The connection dropped. Try again.'); };
   }
   forms.forEach(function (f) {
@@ -223,7 +236,17 @@
     }).catch(function () {});
   }
 
+  /* Signed out, the address typed into the hero form rides in the URL, so after signing in the person
+     comes back to /?url=theirsite and the scan starts on its own. */
+  var hero = $('.hero [data-scan-form] input');
+  if (hero && signedOut) hero.addEventListener('input', function () { try { history.replaceState(null, '', clean(hero.value) ? '/?url=' + encodeURIComponent(clean(hero.value)) : '/'); } catch (e) {} });
+
   var qs = new URLSearchParams(location.search), start = qs.get('url');
-  if (start && forms.length) { forms.forEach(function (o) { o.querySelector('input').value = clean(start); }); live(start, qs.get('rescan') === '1'); }
+  if (start && forms.length) {
+    forms.forEach(function (o) { o.querySelector('input').value = clean(start); });
+    // Signed out on the hosted scanner: ask for the account first (the example keeps playing meanwhile).
+    if (signedOut) { if (box.hasAttribute('data-example')) example(); askSignIn('scan ' + clean(start)); }
+    else live(start, qs.get('rescan') === '1');
+  }
   else if (box.hasAttribute('data-example')) example();
 })();

@@ -41,7 +41,7 @@ function sayFull(e) {
   return lines.join('\n');
 }
 
-/* ctx: { service, ip, reportUrl(slug), onStep(step) } */
+/* ctx: { service, ip, account, reportUrl(slug), onStep(step) }; account is who is asking ({ sub, sid, name }) or null */
 export const OPERATIONS = [
   {
     id: 'scan', tool: 'scan_site', title: 'Scan a website',
@@ -55,7 +55,7 @@ export const OPERATIONS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ url, include_pagespeed, rescan, detail }, ctx) {
-      const { report, cached } = await ctx.service.run(url, { ip: ctx.ip, pagespeed: include_pagespeed !== false, force: !!rescan, onStep: ctx.onStep });
+      const { report, cached } = await ctx.service.run(url, { ip: ctx.ip, account: ctx.account, pagespeed: include_pagespeed !== false, force: !!rescan, onStep: ctx.onStep });
       return reportAnswer(report, cached, detail, ctx);
     },
   },
@@ -97,7 +97,9 @@ export const OPERATIONS = [
     async run({ urls, include_pagespeed }, ctx) {
       const hosts = [...new Set(urls.map(u => hostOf(u)).filter(Boolean))];
       if (hosts.length < 2) throw new ScanError(400, 'Give at least two different web addresses.');
-      const out = await Promise.all(hosts.map(h => ctx.service.run(h, { ip: ctx.ip, pagespeed: include_pagespeed === true }).then(r => r.report, e => ({ error: e.message, host: h }))));
+      const out = await Promise.all(hosts.map(h => ctx.service.run(h, { ip: ctx.ip, account: ctx.account, pagespeed: include_pagespeed === true }).then(r => r.report, e => ({ error: e.message, code: e.code, host: h }))));
+      const needsSignIn = out.find(r => r.code === 'sign_in');
+      if (needsSignIn) throw new ScanError(401, needsSignIn.error, 'sign_in');
       const ok = out.filter(r => !r.error);
       const errors = out.filter(r => r.error).map(r => ({ host: r.host, error: r.error }));
       if (ok.length < 2) throw new ScanError(400, `Could not scan enough of them. ${errors.map(e => `${e.host}: ${e.error}`).join(' ')}`);
@@ -152,9 +154,10 @@ export async function runOperation(id, raw, ctx) {
 }
 
 /* The machine-readable list, served at /api: each capability with its MCP tool and API routes. */
-export function manifest(origin) {
+export function manifest(origin, auth = null) {
   return {
     name: 'warOnSaaS Scanner', mcp: `${origin}/mcp`,
+    ...(auth?.mode === 'waronsaas' && { signIn: { page: `${origin}/auth/waronsaas`, oauth: `${origin}/.well-known/oauth-authorization-server`, needed_for: ['scan', 'compare'], note: 'Viewing is open to anyone. Starting a scan needs a free warOnSaaS account; without one the answer is 401 { error: { code: "sign_in" } }.' } }),
     operations: OPERATIONS.map(o => ({ id: o.id, title: o.title, description: o.description, mcpTool: o.tool,
       api: o.api.map(([m, p]) => `${m} ${p}`), ...(o.stream && { stream: `GET ${o.stream}` }), input: Object.keys(o.input) })),
   };

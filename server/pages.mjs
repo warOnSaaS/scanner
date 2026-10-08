@@ -31,7 +31,14 @@ const I = {
   gh: '<svg viewBox="0 0 16 16" aria-hidden="true" class="fill"><path d="M8 .2a8 8 0 0 0-2.53 15.6c.4.07.55-.17.55-.38v-1.4c-2.23.48-2.7-.94-2.7-.94-.36-.93-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.23 1.88.87 2.33.66.07-.52.28-.87.5-1.07-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 .2z"/></svg>',
 };
 
-function shell({ origin, title, description, canonical = '/', body, page = '', ld = null, robots = 'index,follow', og = true }) {
+/* auth: { mode, signedIn, name, signInUrl, signOutUrl } from auth.mjs's authView. With the warOnSaaS account on, every
+   page carries the account's prompt.js: viewing stays open, and a press on an action while signed out shows the sign-in
+   prompt instead of running. Forms and links that start a scan carry data-tool, which is what the prompt catches. */
+export const OPEN = { mode: 'open', signedIn: false, name: '', signInUrl: '', signOutUrl: '' };
+export const ACCOUNT_URL = 'https://account.waronsaas.com';
+const promptScript = auth => (auth.mode === 'waronsaas' ? `<script src="${ACCOUNT_URL}/prompt.js" defer data-signed-in="${auth.signedIn ? 'true' : 'false'}" data-app="Scanner" data-signin="/auth/waronsaas"></script>\n` : '');
+
+function shell({ origin, title, description, canonical = '/', body, page = '', ld = null, robots = 'index,follow', og = true, auth = OPEN, prompt = true }) {
   return `<!doctype html>
 <html lang="en" data-scheme="midnight" data-shape="round" data-type="grotesk" data-surface="bordered" data-motion="subtle">
 <head>
@@ -54,14 +61,19 @@ ${ld ? `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\
 </head>
 <body class="${page}">
 ${body}
-<script src="${ASSETS['app/scan.js']}" defer></script>
+${prompt ? promptScript(auth) : ''}<script src="${ASSETS['app/scan.js']}" defer></script>
 </body></html>
 `;
 }
 
-const header = () => `<header class="top"><div class="top-in">
+const accountNav = auth => {
+  if (auth.mode !== 'waronsaas') return '';
+  if (!auth.signedIn) return `<a class="nav-acct" href="${esc(auth.signInUrl)}" data-tool="none" data-why="Starts sign-in">Sign in</a>`;
+  return `<a class="nav-acct nav-me" href="${ACCOUNT_URL}" title="Your warOnSaaS account">${esc(auth.name || 'Account')}</a><a class="nav-acct" href="${esc(auth.signOutUrl)}" data-tool="none" data-why="Signs out">Sign out</a>`;
+};
+const header = (auth = OPEN) => `<header class="top"><div class="top-in">
   <a class="brand" href="/" aria-label="warOnSaaS Scanner, home">${TANK}<span>Scanner</span><em>by warOnSaaS</em></a>
-  <nav class="nav" aria-label="Main"><a href="/compare">Compare</a><a href="/#checks">What it checks</a><a href="/#agents">Use it from your agent</a><a class="nav-gh" href="${GITHUB}">${I.gh}<span>GitHub</span></a></nav>
+  <nav class="nav" aria-label="Main"><a href="/compare">Compare</a><a href="/#checks">What it checks</a><a href="/#agents">Use it from your agent</a><a class="nav-gh" href="${GITHUB}">${I.gh}<span>GitHub</span></a>${accountNav(auth)}</nav>
 </div></header>`;
 
 const footer = () => `<footer class="foot"><div class="foot-in">
@@ -69,7 +81,8 @@ const footer = () => `<footer class="foot"><div class="foot-in">
   <p class="foot-r"><a href="/">Run a scan</a><a href="/compare">Compare sites</a><a href="/#checks">What it checks</a><a href="/#agents">Agents</a><a href="/llms.txt">llms.txt</a><a href="${GITHUB}">Source</a><a href="${HUB}">More from warOnSaaS</a></p>
 </div></footer>`;
 
-const composer = ({ id = 'scan', value = '', big = false } = {}) => `<form class="ask${big ? ' ask-big' : ''}" action="/" method="get" data-scan-form role="search">
+/* data-tool names the operation the form runs (scan_site); signed out, the account prompt catches the press. */
+const composer = ({ id = 'scan', value = '', big = false } = {}) => `<form class="ask${big ? ' ask-big' : ''}" action="/" method="get" data-scan-form data-tool="scan_site" data-action-label="run a scan" role="search">
   <label class="ask-in"><span class="ask-pre">https://</span><input id="${id}" name="url" value="${esc(value)}" placeholder="yoursite.com" autocomplete="url" inputmode="url" spellcheck="false" autocapitalize="off" aria-label="Website address" required></label>
   <button class="ask-go" type="submit"><span>Scan</span>${I.arrow}</button>
 </form>`;
@@ -96,7 +109,8 @@ const consoleBox = ({ example = true, loop = false } = {}) => `<div class="con" 
   </div>
 </div>`;
 
-export function homePage({ origin, hasPagespeed = true }) {
+export function homePage({ origin, hasPagespeed = true, auth = OPEN }) {
+  const hosted = auth.mode === 'waronsaas';
   const areaCard = k => {
     const labels = Object.keys(CHECK_AREA).filter(l => CHECK_AREA[l] === k);
     return `<article class="area">
@@ -107,15 +121,16 @@ export function homePage({ origin, hasPagespeed = true }) {
   };
   const mcp = `${origin}/mcp`;
   const copy = v => `<div class="copy"><code>${esc(v)}</code><button type="button" data-copy="${esc(v)}" aria-label="Copy">${I.copy}</button></div>`;
-  const body = `${header()}
+  const tryLink = h => `<a href="/?url=${h}" data-try${hosted ? ' data-tool="scan_site" data-action-label="run a scan"' : ''}>${h}</a>`;
+  const body = `${header(auth)}
 <main id="main">
 <section class="hero">
   <div class="hero-in">
-    <p class="pill"><i class="pulse"></i>Free<span class="sep"></span>no sign-up<span class="sep"></span>open source</p>
+    <p class="pill"><i class="pulse"></i>Free<span class="sep"></span>${hosted ? 'free account to scan' : 'no sign-up'}<span class="sep"></span>open source</p>
     <h1>Can AI assistants read your website?</h1>
     <p class="lede">Put in your website address. In about thirty seconds you see what ChatGPT, Claude and Google can read on your home page, a score out of 100, and the fix for every gap.</p>
     ${composer({ big: true })}
-    <p class="hint">Try <a href="/?url=waronsaas.com" data-try>waronsaas.com</a> or <a href="/?url=example.com" data-try>example.com</a>. We fetch your home page and six public files, the way any crawler does.</p>
+    <p class="hint">Try ${tryLink('waronsaas.com')} or ${tryLink('example.com')}. We fetch your home page and six public files, the way any crawler does.${hosted ? ' Reports are open to everyone; starting a scan takes a free warOnSaaS account.' : ''}</p>
   </div>
   <div class="hero-con">${consoleBox({ example: true })}</div>
 </section>
@@ -145,7 +160,7 @@ export function homePage({ origin, hasPagespeed = true }) {
     <article class="card"><header><h3>Claude</h3><span>Web, desktop and phone</span></header>
       <p>Settings, then Connectors, then Add custom connector. Paste this address.</p>${copy(mcp)}</article>
     <article class="card"><header><h3>ChatGPT</h3><span>Developer mode</span></header>
-      <p>Settings, then Apps and Connectors, then Create. Paste this address, no sign-in needed.</p>${copy(mcp)}</article>
+      <p>Settings, then Apps and Connectors, then Create. Paste this address${hosted ? ' and sign in with your warOnSaaS account when it asks' : ', no sign-in needed'}.</p>${copy(mcp)}</article>
     <article class="card"><header><h3>Claude Code</h3><span>Terminal</span></header>
       <p>One command, then ask it to scan a site.</p>${copy(`claude mcp add --transport http scanner ${mcp}`)}</article>
     <article class="card"><header><h3>Codex</h3><span>Terminal</span></header>
@@ -153,8 +168,10 @@ export function homePage({ origin, hasPagespeed = true }) {
     <article class="card"><header><h3>On your own computer</h3><span>Command line</span></header>
       <p>Scan from your machine, print the report or save it as JSON.</p>${copy('npx github:warOnSaaS/scanner example.com')}</article>
     <article class="card"><header><h3>From your code</h3><span>HTTP</span></header>
-      <p>JSON back, or a live stream of each step with <code>/api/scan/stream</code>. <a href="/api">Every route</a>.</p>${copy(`curl "${origin}/api/scan?url=example.com"`)}</article>
+      ${hosted ? `<p>Reports as JSON, open to anyone. Scanning from code signs in the same way an AI app does. <a href="/api">Every route</a>.</p>${copy(`curl "${origin}/api/report?url=example.com"`)}`
+        : `<p>JSON back, or a live stream of each step with <code>/api/scan/stream</code>. <a href="/api">Every route</a>.</p>${copy(`curl "${origin}/api/scan?url=example.com"`)}`}</article>
   </div>
+  ${hosted ? `<p class="try-say">Your assistant signs in once, with your warOnSaaS account, and then acts as you. You can see it and sign it out at <a href="${ACCOUNT_URL}">account.waronsaas.com</a>.</p>` : ''}
   <p class="try-say">Try saying: <q>Scan mysite.com and tell me the three fixes worth the most.</q> <q>Compare mysite.com with competitor.com.</q></p>
 </section>
 
@@ -166,12 +183,13 @@ export function homePage({ origin, hasPagespeed = true }) {
   <ul class="limits">
     <li>It reads the home page and a handful of public files: llms.txt, llms-full.txt, ai.txt, .well-known/ucp, robots.txt and sitemap.xml. It does not crawl the whole site, log in or fill in forms.</li>
     <li>Some sites turn automated visitors away. The scan reports what it saw; an AI assistant's own crawler may be treated differently.</li>
-    <li>A site scanned in the last day is served from that scan, so nobody's server gets fetched twice in a day. Each visitor can run a few fresh scans every ten minutes.</li>
+    <li>A site scanned in the last day is served from that scan, so nobody's server gets fetched twice in a day. ${hosted ? 'Each account can run 20 fresh scans an hour and 100 a day, from the page and from its AI apps together.' : 'Each visitor can run a few fresh scans every ten minutes.'}</li>
+    ${hosted ? '<li>Looking never needs an account: every report and share link is open. Starting a scan does, so the allowance is fair and your AI assistant can scan as you.</li>' : ''}
   </ul>
 </section>
 </main>
 ${footer()}`;
-  return shell({ origin, title: 'Website scanner: can AI assistants read your site?', page: 'is-home',
+  return shell({ origin, auth, title: 'Website scanner: can AI assistants read your site?', page: 'is-home',
     description: 'A free scan of what ChatGPT, Claude and Google can read on your website: a score out of 100 and the fix for every gap. Open source, with an MCP server for your own agents.',
     body, ld: { '@context': 'https://schema.org', '@graph': [
       { '@type': 'WebApplication', name: 'warOnSaaS Scanner', url: origin + '/', applicationCategory: 'DeveloperApplication', operatingSystem: 'Any', offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -197,8 +215,9 @@ const ring = n => {
 };
 
 /* e: the explained report, exactly what the report operation (get_report, /api/report) returns. */
-export function reportPage(e, { origin }) {
+export function reportPage(e, { origin, auth = OPEN }) {
   const rec = e;
+  const hosted = auth.mode === 'waronsaas';
   const url = e.url || `${origin}/report/${e.slug}`;
   const tone = n => n >= 80 ? 'good' : n >= 50 ? 'warn' : 'bad';
   const unreachable = e.verdict.key === 'unreachable';
@@ -209,7 +228,7 @@ export function reportPage(e, { origin }) {
       <div class="ui-acc-b">${c.why ? `<p><b>Why it matters.</b> ${esc(c.why)}</p>` : ''}${!c.pass && c.how ? `<p><b>How to fix it.</b> ${esc(c.how)}</p>` : ''}<p class="worth">${c.pass ? `Passing. Worth ${c.points} of the 100 points.` : `Fixing this adds about ${c.points} points to the score.`}</p></div></details>`).join('')}</div>
   </section>`;
 
-  const body = `${header()}
+  const body = `${header(auth)}
 <main id="main" class="rp">
 <section class="rp-top">
   <p class="kicker">Report<span class="sep"></span>scanned ${esc(date(e.scannedAt))}</p>
@@ -220,7 +239,7 @@ export function reportPage(e, { origin }) {
       <span class="verdict t-${e.verdict.tone}">${esc(e.verdict.label)}</span>
       <p class="rp-note">${esc(e.verdict.note)}</p>
       ${e.summary ? `<p class="rp-mean">${esc(e.summary)}</p>` : ''}
-      <div class="rp-act"><button class="btn" type="button" data-copy="${esc(url)}">${I.copy}<span>Copy link</span></button><a class="btn btn-ghost" href="/?url=${encodeURIComponent(e.host)}&amp;rescan=1">Scan again</a><a class="btn btn-ghost" href="/compare?urls=${encodeURIComponent(e.host)}">Compare</a><a class="btn btn-ghost" href="/api/report/${esc(rec.slug)}">JSON</a></div>
+      <div class="rp-act"><button class="btn" type="button" data-copy="${esc(url)}">${I.copy}<span>Copy link</span></button><a class="btn btn-ghost" href="/?url=${encodeURIComponent(e.host)}&amp;rescan=1"${hosted ? ' data-tool="scan_site" data-action-label="scan again"' : ''}>Scan again</a><a class="btn btn-ghost" href="/compare?urls=${encodeURIComponent(e.host)}">Compare</a><a class="btn btn-ghost" href="/api/report/${esc(rec.slug)}">JSON</a></div>
     </div>
   </div>
   ${unreachable ? '' : `<ul class="rp-strip">${e.areas.map(a => `<li><a href="#area-${a.key}"><span>${esc(a.name)}</span><b class="t-${a.tone}">${a.score}</b><i><s style="width:${a.score}%" class="t-${a.tone}"></s></i><small>${Math.round(a.share * 100)}% of the score</small></a></li>`).join('')}</ul>`}
@@ -258,20 +277,20 @@ ${e.llms ? `<section class="rp-sec rp-llms">
 </section>
 </main>
 ${footer()}`;
-  return shell({ origin, canonical: `/report/${rec.slug}`, robots: 'noindex,follow', page: 'is-report',
+  return shell({ origin, auth, canonical: `/report/${rec.slug}`, robots: 'noindex,follow', page: 'is-report',
     title: `${e.host} scores ${e.grade}/100 · warOnSaaS Scanner`,
     description: `${e.host} scores ${e.grade} out of 100 for what AI assistants and search engines can read. ${e.verdict.label}.`, body });
 }
 
-export function comparePage({ origin }) {
+export function comparePage({ origin, auth = OPEN }) {
   const field = (n, ph) => `<label class="cmp-f"><span>${n}</span><input name="urls" placeholder="${ph}" autocomplete="off" inputmode="url" spellcheck="false" autocapitalize="off"${n < 3 ? ' required' : ''}></label>`;
-  const body = `${header()}
+  const body = `${header(auth)}
 <main id="main" class="rp">
 <section class="rp-top">
   <p class="kicker">Compare</p>
   <h1>Your site next to a competitor's.</h1>
   <p class="rp-mean">Put in two to five websites. Each one is scanned (or its scan from the last day is used) and you see the scores side by side, and the checks one passes and another fails.</p>
-  <form class="cmp" data-compare-form>
+  <form class="cmp" data-compare-form data-tool="compare_sites" data-action-label="compare sites">
     <div class="cmp-fields">${field(1, 'yoursite.com')}${field(2, 'competitor.com')}${field(3, 'optional')}</div>
     <div class="cmp-act"><label class="cmp-psi"><input type="checkbox" name="pagespeed"> Include Google PageSpeed (slower)</label><button class="btn" type="submit">Compare ${I.arrow}</button></div>
   </form>
@@ -279,25 +298,27 @@ export function comparePage({ origin }) {
 <section class="rp-sec" data-compare-out hidden aria-live="polite"></section>
 </main>
 ${footer()}`;
-  return shell({ origin, canonical: '/compare', page: 'is-compare', title: 'Compare websites for AI assistants and search · warOnSaaS Scanner',
+  return shell({ origin, auth, canonical: '/compare', page: 'is-compare', title: 'Compare websites for AI assistants and search · warOnSaaS Scanner',
     description: 'Compare two to five websites: what AI assistants and search engines can read on each, scored out of 100, and where they differ.', body });
 }
 
 export function embedPage({ origin }) {
-  return shell({ origin, canonical: '/', robots: 'noindex', og: false, page: 'is-embed', title: 'warOnSaaS Scanner, live preview',
+  // The embed is the example on a loop inside another site's frame: nothing to press, so no prompt script.
+  return shell({ origin, prompt: false, canonical: '/', robots: 'noindex', og: false, page: 'is-embed', title: 'warOnSaaS Scanner, live preview',
     description: 'The warOnSaaS Scanner scanning a site, on a loop.', body: `<main>${consoleBox({ example: true, loop: true })}</main>` });
 }
 
-export function notFoundPage({ origin, slug = '' }) {
+export function notFoundPage({ origin, slug = '', auth = OPEN }) {
   const host = slug ? slug.replace(/-/g, '.') : '';
-  return shell({ origin, canonical: '/', robots: 'noindex', page: 'is-report', title: 'Not found · warOnSaaS Scanner', description: 'Nothing here.',
-    body: `${header()}<main id="main" class="rp"><section class="rp-top rp-empty">
+  return shell({ origin, auth, canonical: '/', robots: 'noindex', page: 'is-report', title: 'Not found · warOnSaaS Scanner', description: 'Nothing here.',
+    body: `${header(auth)}<main id="main" class="rp"><section class="rp-top rp-empty">
     <p class="kicker">Not found</p><h1>${slug ? 'That site has not been scanned yet.' : 'Nothing here.'}</h1>
     <p class="rp-mean">${slug ? 'Put the address in and it takes about thirty seconds.' : 'Scan a website instead.'}</p>
     ${composer({ value: host })}</section></main>${footer()}` });
 }
 
-export function llmsTxt({ origin }) {
+export function llmsTxt({ origin, auth = OPEN }) {
+  const hosted = auth.mode === 'waronsaas';
   return `# warOnSaaS Scanner
 
 > A free, open-source scan of what AI assistants and search engines can read on a website's home page, scored out of 100, with the fix for every gap. No AI model is involved, so the same site gets the same score every time.
@@ -314,8 +335,9 @@ ${AREAS.map(k => `- ${AREA_NAME[k]} (${Math.round(AREA_SHARE[k] * 100)}% of the 
 
 ## For agents
 
-- MCP server (Streamable HTTP, no sign-in): ${origin}/mcp. Tools: scan_site, get_report, compare_sites, list_checks.
-- JSON API: GET ${origin}/api/scan?url=example.com, GET ${origin}/api/report/example-com
+- MCP server (Streamable HTTP${hosted ? ', OAuth sign-in with a free warOnSaaS account' : ', no sign-in'}): ${origin}/mcp. Tools: scan_site, get_scan_status, get_report, compare_sites, list_recent_scans, list_checks.
+- JSON API: GET ${origin}/api/scan?url=example.com${hosted ? ' (signed in)' : ''}, GET ${origin}/api/report/example-com${hosted ? ' (open to anyone)' : ''}${hosted ? `
+- Reading any report or page never needs an account. Starting a scan does; without one the API answers 401 with error.code "sign_in". Sign in at ${origin}/auth/waronsaas; OAuth discovery for AI apps at ${origin}/.well-known/oauth-authorization-server.` : ''}
 - Live stream: GET ${origin}/api/scan/stream?url=example.com (server-sent events: step, area, done, fail)
 `;
 }
