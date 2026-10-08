@@ -10,7 +10,9 @@
               sign in we send them to the account as a connection ("Claude via Scanner"), then issue
               our own bearer tokens to the app. Codes, client ids and tokens are sealed, not stored.
    account.isLive(sid) is asked (cached a minute) whenever a cookie or token is read, so "sign out
-   everywhere" on the account reaches the scanner.
+   everywhere" on the account reaches the scanner. The account also POSTs /auth/waronsaas/backchannel the
+   moment someone signs out everywhere or deletes their account; that ends their sessions on this
+   instance at once (the scanner keeps no table of sessions, so other instances catch up through isLive).
 
    Self-hosted copies: AUTH_PROVIDER=github or local (or no WOS_ACCOUNT_CLIENT_ID) leaves the scanner
    as it always was, open with per-visitor limits; the scanner never had a sign-in of its own. */
@@ -77,10 +79,15 @@ export function createAuth({ env = process.env, account, siteUrl = env.SITE_URL 
   const redirect = (res, location, cookies = []) => res.writeHead(302, { location, 'cache-control': 'no-store', ...(cookies.length && { 'set-cookie': cookies }) }).end();
   const person = p => ({ sub: p.sub, sid: p.sid, name: p.name || p.github_login || p.email || '', email: p.email || '' });
   const cookie = (value, origin, maxAge = 30 * DAY) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure(origin) ? '; Secure' : ''}`;
-  const alive = async who => (who && (await account.isLive(who.sid)) ? who : null);
+  // Accounts the back channel told us about: sub -> when. Anything issued before then is dead.
+  const ended = new Map();
+  const alive = async raw => {
+    if (!raw || (ended.get(raw.sub) ?? 0) > (raw.iat ?? 0)) return null;
+    return (await account.isLive(raw.sid)) ? person(raw) : null;
+  };
   const tokens = (who, cid) => ({
-    access_token: seal({ k: 'access', ...who, cid, exp: now() + 30 * DAY }),
-    refresh_token: seal({ k: 'refresh', ...who, cid, exp: now() + 365 * DAY }),
+    access_token: seal({ k: 'access', ...who, cid, iat: now(), exp: now() + 30 * DAY }),
+    refresh_token: seal({ k: 'refresh', ...who, cid, iat: now(), exp: now() + 365 * DAY }),
     token_type: 'Bearer', expires_in: 30 * DAY, scope: 'scan',
   });
 
@@ -91,14 +98,12 @@ export function createAuth({ env = process.env, account, siteUrl = env.SITE_URL 
     /* The browser's session, from our cookie: { sub, sid, name, email } or null. */
     async session(req) {
       const raw = cookieOf(req, COOKIE);
-      const s = raw ? open(raw, 'session') : null;
-      return alive(s && person(s));
+      return alive(raw ? open(raw, 'session') : null);
     },
     /* An AI app's or a script's session, from a bearer token we issued. */
     async bearer(req) {
       const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? '');
-      const t = m ? open(m[1].trim(), 'access') : null;
-      return alive(t && person(t));
+      return alive(m ? open(m[1].trim(), 'access') : null);
     },
     /* Either, for the API routes: a cookie from the page, or a token from code. */
     async who(req) { return (await auth.bearer(req)) || (await auth.session(req)); },
@@ -135,10 +140,19 @@ export function createAuth({ env = process.env, account, siteUrl = env.SITE_URL 
         }
         if (r.error) return redirect(res, safeNext(r.next), [r.clear]), true;
         // The scanner keeps no table of people: the account id is the person, carried in our cookie.
-        return redirect(res, safeNext(r.next), [r.clear, cookie(seal({ k: 'session', ...person(r.profile), exp: now() + 30 * DAY }), origin)]), true;
+        return redirect(res, safeNext(r.next), [r.clear, cookie(seal({ k: 'session', ...person(r.profile), iat: now(), exp: now() + 30 * DAY }), origin)]), true;
       }
       if (p === '/auth/signout') {
         return redirect(res, account.endSessionUrl(origin + '/'), [cookie('', origin, 0)]), true;
+      }
+      if (p === '/auth/waronsaas/backchannel') {
+        // The account says someone signed out everywhere or deleted their account. Always 200.
+        if (req.method !== 'POST') return json(res, 405, { ok: false }), true;
+        const b = await readBody(req);
+        const hit = account.verifyLogoutToken ? await account.verifyLogoutToken(b.logout_token).catch(() => null) : null;
+        if (hit?.sub) ended.set(hit.sub, now());
+        if (ended.size > 5000) ended.delete(ended.keys().next().value);
+        return json(res, 200, { ok: true }), true;
       }
 
       // ---- MCP OAuth: the scanner is the authorization server AI apps talk to ----

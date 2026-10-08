@@ -33,6 +33,7 @@ function fakeAccount({ live = new Set(['ses_1']), limits = {} } = {}) {
       return { profile: { sub, sid: q.get('sid') || 'ses_1', name: 'Sam Example', email: `${sub}@example.test`, email_verified: true }, next: flow.next, carry: flow.carry, clear };
     },
     async isLive(sid) { return live.has(sid); },
+    async verifyLogoutToken(jwt) { const m = /^logout:([^:]+)(:deleted)?$/.exec(String(jwt ?? '')); return m ? { sub: m[1], deleted: !!m[2] } : null; },
     async limit(account, bucket, max) {
       const k = `${account}:${bucket}`;
       const n = (hits.get(k) || 0) + 1; hits.set(k, n);
@@ -194,6 +195,26 @@ test('a dead account session (sign out everywhere) signs the person out here too
     s.auth.account.live.delete?.('ses_1');
     assert.match(await (await s.get('/', { cookie })).text(), /data-signed-in="false"/);
     assert.equal((await s.get('/api/scan?url=good.test', { cookie })).status, 401);
+  } finally { await s.close(); }
+});
+
+test('the back channel: the account says sign out everywhere, and that person is out at once', async () => {
+  const s = await hostedServer();
+  try {
+    const sam = await s.signIn('acc_sam', 'ses_1');
+    await new Promise(ok => setTimeout(ok, 1100)); // the session's second must be before the logout's
+    const riley = await s.signIn('acc_riley', 'ses_1');
+    const bad = await fetch(`${s.base}/auth/waronsaas/backchannel`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ logout_token: 'nonsense' }) });
+    assert.equal(bad.status, 200, 'always 200');
+    assert.match(await (await s.get('/', { cookie: sam })).text(), /data-signed-in="true"/, 'a bad token changes nothing');
+    const ok = await fetch(`${s.base}/auth/waronsaas/backchannel`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ logout_token: 'logout:acc_sam:deleted' }) });
+    assert.equal(ok.status, 200);
+    assert.match(await (await s.get('/', { cookie: sam })).text(), /data-signed-in="false"/, 'Sam is out, even though the account session check still says live');
+    assert.equal((await s.get('/api/scan?url=good.test', { cookie: sam })).status, 401);
+    assert.match(await (await s.get('/', { cookie: riley })).text(), /data-signed-in="true"/, 'Riley is untouched');
+    await new Promise(ok => setTimeout(ok, 1100));
+    const samAgain = await s.signIn('acc_sam', 'ses_1');
+    assert.match(await (await s.get('/', { cookie: samAgain })).text(), /data-signed-in="true"/, 'a new sign-in after the logout works');
   } finally { await s.close(); }
 });
 
